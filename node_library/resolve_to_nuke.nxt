@@ -1,0 +1,253 @@
+{
+    "version": "1.17",
+    "alias": "resolve_to_nuke",
+    "color": "#c91781",
+    "mute": false,
+    "solo": false,
+    "meta_data": {
+        "positions": {
+            "/execute": [
+                289.0,
+                -133.0
+            ],
+            "/node": [
+                93.0,
+                -88.0
+            ],
+            "/setup": [
+                -170.0,
+                -132.0
+            ]
+        },
+        "collapse": {
+            "/execute/loop": false,
+            "/setup": false,
+            "/setup/find_fusion_comps": false,
+            "/setup/nuke_shot_template": false
+        }
+    },
+    "nodes": {
+        "/": {
+            "attrs": {
+                "nuke_output_directory": {
+                    "type": "str",
+                    "value": "\"\""
+                },
+                "resolve_vfx_root": {
+                    "type": "str",
+                    "value": "\"\""
+                }
+            }
+        },
+        "/execute": {
+            "execute_in": "/setup",
+            "child_order": [
+                "loop"
+            ],
+            "code": [
+                "msg = \"\"\"",
+                "",
+                "Found {fusion_comps} fusion compositions.",
+                "",
+                "Source Folder: ${resolve_vfx_root}",
+                "Output Folder: ${nuke_output_directory}",
+                "\"\"\".format(fusion_comps=len(${/setup/find_fusion_comps.fusion_comps}))",
+                "",
+                "print(msg)"
+            ]
+        },
+        "/execute/loop": {
+            "code": [
+                "import os.path as pt",
+                "import os",
+                "import subprocess as sp",
+                "",
+                "output_dir = ${/setup.nuke_output_directory}",
+                "",
+                "os.makedirs(output_dir, exist_ok=True)",
+                "",
+                "",
+                "for comp in ${/setup/find_fusion_comps.fusion_comps}:",
+                "    nuke_script_name=pt.basename(comp).replace(\".comp\",\".nk\")",
+                "    ",
+                "    nuke_script=pt.join(output_dir,nuke_script_name)",
+                "",
+                "    #print(\"Nuke Script Name : \" + nuke_script_name)",
+                "    #print(\"Nuke Script      : \" + nuke_script)",
+                "    ",
+                "    if not pt.exists(nuke_script):",
+                "        print(\"Will Create a new nuke script for {}\".format(nuke_script))",
+                "",
+                "        ",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/Loader/,/Saver/p' | grep Filename | sed 's/^.*Filename = //g' | sed 's/[\\\",]//g' | sed 's/[0-9]*\\.exr/_########\\.exr/g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        source_clip = pipe.stdout.read().decode().strip()",
+                "       ",
+                "        ",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/Saver/,/Views/p' | grep Filename | sed 's/^.*Filename = //g' | sed 's/[\\\",]//g' | sed 's/[0-9]*\\.exr/_########\\.exr/g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        target_clip = pipe.stdout.read().decode().strip()",
+                "      ",
+                "        ",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/FrameFormat/,/Views/p' | grep -a Width | awk '{{print $3}}' | sed 's/[\\\",]//g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        width = pipe.stdout.read().decode().strip()",
+                "      ",
+                "        ",
+                "        # NOT WORKING?",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/FrameFormat/,/Views/p' | grep -a Height | awk '{{print $3}}' | sed 's/[\\\",]//g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        height = pipe.stdout.read().decode().strip()",
+                "  ",
+                "      ",
+                "        ",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/FrameFormat/,/Views/p' | grep -a Rate | awk '{{print $3}}' | sed 's/[\\\",]//g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        frame_rate = pipe.stdout.read().decode().strip()",
+                "     ",
+                "        ",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/Loader/,/Saver/p' | grep -a GlobalStart | awk '{{print $3}}' | sed 's/[\\\",]//g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        start = pipe.stdout.read().decode().strip()",
+                "      ",
+                "       ",
+                "        cmd = \"\"\"cat \"{comp}\" | sed -n '/Loader/,/Saver/p' | grep -a GlobalEnd | awk '{{print $3}}' | sed 's/[\\\",]//g'\"\"\".format(comp=comp)",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        end = pipe.stdout.read().decode().strip()",
+                "     ",
+                "        scpt = \"\"\"${/setup/nuke_shot_template.shot_template}\"\"\".format(width=width,height=height,framerate=frame_rate,start=start,end=end,sourceclip=source_clip, targetclip=target_clip,nuke_script=nuke_script)",
+                "        with open(${/setup.python_tmp},\"w\") as script:",
+                "            script.write(scpt)",
+                "        ",
+                "        # call nuke to create nuke script",
+                "        cmd = \"\"\"nuke -t < ${/setup.python_tmp} \"\"\"",
+                "        pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "        res = pipe.stdout.read().decode().strip()",
+                "        if \"Error\" in res:",
+                "            print(\"Error\")",
+                "        else:",
+                "            print(\"Success\")",
+                "            ",
+                "        ",
+                "    else:",
+                "        pass",
+                "        #print(\"Found a matching nuke script, skipping...\")"
+            ]
+        },
+        "/setup": {
+            "start_point": true,
+            "child_order": [
+                "nuke_shot_template",
+                "find_fusion_comps"
+            ],
+            "attrs": {
+                "fusion_comps": {
+                    "type": "list",
+                    "value": "[]"
+                },
+                "nuke_cmd": {
+                    "type": "str",
+                    "value": "\"nuke -crashhandling 0 --nukex\""
+                },
+                "python_tmp": {
+                    "type": "str",
+                    "value": "\"/tmp/resolve_to_nuke_commands.py\""
+                },
+                "results_tmp": {
+                    "type": "str",
+                    "value": "\"/tmp/result.out\""
+                },
+                "shot_template": {
+                    "type": "str",
+                    "value": "\"\""
+                }
+            },
+            "code": [
+                "if (${resolve_vfx_root} == \"\"):",
+                "    raise Exception(\"Missing input directory\")",
+                "        ",
+                "if (${nuke_output_directory} == \"\"):",
+                "    STAGE.nuke_output_directory = w(${resolve_vfx_root})",
+                "       "
+            ]
+        },
+        "/setup/find_fusion_comps": {
+            "code": [
+                "import subprocess as sp",
+                "",
+                "cmd = \"\"\"find ${resolve_vfx_root} -name \"*.comp\" | grep -v \"\\._\" \"\"\"",
+                "pipe = sp.Popen(['/bin/bash', '-c', '%s' %(cmd)], stdout=sp.PIPE)",
+                "",
+                "output = pipe.stdout.read().decode()",
+                "self.fusion_comps = output.split()"
+            ]
+        },
+        "/setup/nuke_shot_template": {
+            "code": [
+                "self.shot_template = \"\"\"## create a new resolution format ###################################",
+                "resolvefusion = '{width} {height} resolve fusion'",
+                "nuke.addFormat( resolvefusion )",
+                "",
+                "## set general project session parameters ###################################",
+                "root = nuke.root()",
+                "root['format'].setValue( 'resolve fusion' )",
+                "root['fps'].setValue( {framerate} )",
+                "root['first_frame'].setValue( 0 )",
+                "root['last_frame'].setValue( {end} -  {start} )",
+                "",
+                "## Create read node and set values ##################################",
+                "r = nuke.nodes.Read(file = \"{sourceclip}\")",
+                "r['file'].fromUserText(\"{sourceclip}\")",
+                "r['xpos'].setValue(50)",
+                "r['ypos'].setValue(0)",
+                "r['first'].setValue( {start} )",
+                "r['last'].setValue( {end} )",
+                "r['origfirst'].setValue( {start} )",
+                "r['origlast'].setValue( {end} )",
+                "r['format'].setValue( 'resolve fusion' )",
+                "",
+                "to = nuke.createNode(\"TimeOffset\")",
+                "to['xpos'].setValue(50)",
+                "to['ypos'].setValue(80)",
+                "to[\"time_offset\"].setValue(- {start} )",
+                "to.setInput( 0, r )",
+                "",
+                "## Create write node and set values #################################",
+                "w = nuke.nodes.Write(file = \"{targetclip}\")",
+                "w.setInput( 0, to )",
+                "w['xpos'].setValue(800)",
+                "w['ypos'].setValue(63)",
+                "w['first'].setValue( {start} )",
+                "w['last'].setValue( {end} )",
+                "w['postage_stamp'].setValue( 'true' )",
+                "",
+                "## create some nice backdrops",
+                "b1 = nuke.nodes.BackdropNode()",
+                "b1['xpos'].setValue(20)",
+                "b1['ypos'].setValue(-40)",
+                "b1['bdwidth'].setValue(140)",
+                "b1['bdheight'].setValue(180)",
+                "b1['tile_color'].setValue(560344063)",
+                "b1['note_font_color'].setValue(255)",
+                "b1['label'].setValue('<center>Fusion Connect Source</center>')",
+                "",
+                "b2 = nuke.nodes.BackdropNode()",
+                "b2['xpos'].setValue(770)",
+                "b2['ypos'].setValue(23)",
+                "b2['bdwidth'].setValue(140)",
+                "b2['bdheight'].setValue(140)",
+                "b2['tile_color'].setValue(2304183295)",
+                "b2['note_font_color'].setValue(255)",
+                "b2['label'].setValue('<center>Fusion Connect Render</center>')",
+                "",
+                "## Connect viewer  #########################",
+                "nuke.toNode(\"Viewer1\").connectInput(0,r)",
+                "",
+                "## create nuke script ###############################################",
+                "nuke.scriptSaveAs(\"{nuke_script}\")",
+                "quit()",
+                "\"\"\""
+            ]
+        }
+    }
+}
